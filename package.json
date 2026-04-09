@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "FACEPrep Interactive Java Training Slides",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "slidev src/01-introduction-to-java.md --open",
     "dev:01": "slidev src/01-introduction-to-java.md --open",
