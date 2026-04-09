@@ -1,0 +1,116 @@
+/* =============================
+   FACEPrep Slidev Theme
+   Brand: #ff5900 (orange primary)
+   Accent: #4A90D9 (blue)
+   ============================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* ── Root Overrides ── */
+:root {
+  --slidev-theme-primary: #ff5900;
+  --slidev-theme-secondary: #4A90D9;
+  --fp-primary: #ff5900;
+  --fp-primary-light: #ff8c42;
+  --fp-accent: #4A90D9;
+}
+
+/* ── Base slide typography ── */
+.slidev-layout {
+  font-family: 'Inter', system-ui, sans-serif;
+  padding-bottom: 48px !important; /* room for footer */
+}
+
+/* ── Slide background: clean white with subtle FP branded top accent ── */
+.slidev-layout.default,
+.slidev-layout.two-cols,
+.slidev-layout.center {
+  background: #ffffff;
+  border-top: 3px solid #ff5900;
+}
+
+/* ── Cover slide ── */
+.slidev-layout.cover {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+  color: white;
+  border-top: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.slidev-layout.cover::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(255, 89, 0, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.slidev-layout.cover::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -10%;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(74, 144, 217, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* ── Heading colors ── */
+h1, h2 {
+  font-family: 'Outfit', system-ui, sans-serif;
+  color: #0f172a;
+}
+
+.slidev-layout.cover h1,
+.slidev-layout.cover h2,
+.slidev-layout.cover p {
+  color: #f8fafc;
+}
+
+/* ── Accent top bar on default slides ── */
+.slidev-layout.default h2 {
+  padding-left: 0.85rem;
+  border-left: 4px solid #ff5900;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Scrollbar global theme ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ff590055 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 89, 0, 0.35);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Code blocks ── */
+pre, code {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* ── Selection color ── */
+::selection {
+  background: rgba(255, 89, 0, 0.25);
+  color: #0f172a;
+}

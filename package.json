@@ -1,0 +1,18 @@
+{
+  "name": "faceprep-java-slides",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FACEPrep Interactive Java Training Slides",
+  "scripts": {
+    "dev": "slidev src/01-introduction-to-java.md --open",
+    "dev:01": "slidev src/01-introduction-to-java.md --open",
+    "build": "slidev build src/01-introduction-to-java.md --base /",
+    "preview": "npx serve dist"
+  },
+  "dependencies": {
+    "@slidev/cli": "latest",
+    "@slidev/theme-default": "latest",
+    "monaco-editor": "^0.46.0",
+    "vue": "^3.4.0"
+  }
+}
