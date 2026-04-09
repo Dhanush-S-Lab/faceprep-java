@@ -4,12 +4,12 @@
   "private": true,
   "description": "FACEPrep Interactive Java Training Slides",
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "slidev src/01-introduction-to-java.md --open",
     "dev:01": "slidev src/01-introduction-to-java.md --open",
-    "build": "slidev build src/01-introduction-to-java.md --base /",
+    "build": "cross-env NODE_OPTIONS=--max_old_space_size=3072 slidev build src/01-introduction-to-java.md --base /",
     "preview": "npx serve dist"
   },
   "dependencies": {
@@ -17,5 +17,8 @@
     "@slidev/theme-default": "latest",
     "monaco-editor": "^0.46.0",
     "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
   }
 }
