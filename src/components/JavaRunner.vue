@@ -104,6 +104,35 @@ onUnmounted(() => {
 
 const showVisualizer = ref(false)
 const visualizerUrl = ref('')
+const editorTheme = ref('vs-dark')
+const fontSize = ref(14)
+const wordWrap = ref('off')
+
+const toggleTheme = () => {
+  editorTheme.value = editorTheme.value === 'vs-dark' ? 'vs' : 'vs-dark'
+  monaco.editor.setTheme(editorTheme.value)
+}
+
+const changeFontSize = (delta) => {
+  fontSize.value = Math.max(10, Math.min(32, fontSize.value + delta))
+  if (editorInstance) editorInstance.updateOptions({ fontSize: fontSize.value })
+  // Force layout update internally 
+  setTimeout(() => { if (editorInstance) editorInstance.layout() }, 50)
+}
+
+const toggleWordWrap = () => {
+  wordWrap.value = wordWrap.value === 'off' ? 'on' : 'off'
+  if (editorInstance) editorInstance.updateOptions({ wordWrap: wordWrap.value })
+}
+
+const resetCode = () => {
+  if (editorInstance && confirm('Are you sure you want to reset your code to the starter template?')) {
+    editorInstance.setValue(props.initialCode || STARTER_CODE[selectedLanguage.value])
+    output.value = ''
+    isError.value = false
+    showVisualizer.value = false
+  }
+}
 
 const visualizeCode = () => {
   if (!editorInstance) return
@@ -170,7 +199,7 @@ const executeCode = async () => {
 <template>
   <div class="java-runner">
     <div v-if="question" class="question-pane">
-      <div class="question-icon">📌</div>
+      <div class="i-lucide-help-circle question-icon"></div>
       <div class="question-text">{{ question }}</div>
     </div>
 
@@ -180,6 +209,26 @@ const executeCode = async () => {
         <span class="dot yellow"></span>
         <span class="dot green"></span>
         <span class="filename">{{ filename }}</span>
+
+        <!-- Editor Toolbar -->
+        <div class="toolbar">
+          <button class="icon-btn" @click="resetCode" title="Reset Code">
+            <div class="i-lucide-rotate-ccw"></div>
+          </button>
+          <button class="icon-btn" @click="toggleTheme" title="Toggle Theme">
+            <div v-if="editorTheme === 'vs-dark'" class="i-lucide-sun"></div>
+            <div v-else class="i-lucide-moon"></div>
+          </button>
+          <button class="icon-btn" @click="changeFontSize(-1)" title="Decrease Font">
+            <div class="i-lucide-minus"></div>
+          </button>
+          <button class="icon-btn" @click="changeFontSize(1)" title="Increase Font">
+            <div class="i-lucide-plus"></div>
+          </button>
+          <button class="icon-btn" @click="toggleWordWrap" :class="{ 'wrap-active': wordWrap === 'on' }" title="Toggle Word Wrap">
+            <div class="i-lucide-wrap-text"></div>
+          </button>
+        </div>
 
         <!-- Language Selector -->
         <div class="lang-selector">
@@ -196,11 +245,12 @@ const executeCode = async () => {
         </div>
 
         <button @click="visualizeCode" :disabled="isRunning" class="visualize-btn">
-          <span class="icon">👁️</span> Visualize
+          <div class="i-lucide-eye"></div> Visualize
         </button>
 
         <button @click="executeCode" :disabled="isRunning" class="run-btn" :class="{ running: isRunning }">
-          <span class="icon">{{ isRunning ? '⚙' : '▶' }}</span>
+          <div v-if="isRunning" class="i-lucide-loader-2 animate-spin"></div>
+          <div v-else class="i-lucide-play"></div>
           {{ isRunning ? 'Running' : 'Run' }}
         </button>
       </div>
@@ -221,7 +271,9 @@ const executeCode = async () => {
     <div v-if="showVisualizer" class="visualizer-pane pane">
       <div class="visualizer-header">
         <label>Memory Visualizer</label>
-        <button @click="showVisualizer = false" class="close-btn">✖ Close</button>
+        <button @click="showVisualizer = false" class="close-btn">
+          <div class="i-lucide-x"></div> Close
+        </button>
       </div>
       <iframe :src="visualizerUrl" width="100%" height="500" frameborder="0"></iframe>
     </div>
@@ -413,10 +465,13 @@ const executeCode = async () => {
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 0.25rem 0.5rem;
+  padding: 0.35rem 0.6rem;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   transition: background 0.15s ease;
 }
 
@@ -424,12 +479,8 @@ const executeCode = async () => {
   background: #dc2626;
 }
 
-.run-btn.running .icon {
-  animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-  100% { transform: rotate(360deg); }
+.icon-btn > div, .visualize-btn > div, .run-btn > div {
+  font-size: 1.1em;
 }
 
 /* Language Selector */
@@ -454,6 +505,35 @@ const executeCode = async () => {
   cursor: pointer;
   transition: all 0.15s ease;
   letter-spacing: 0.02em;
+}
+
+.toolbar {
+  display: flex;
+  gap: 4px;
+  margin-left: 1rem;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.icon-btn.wrap-active {
+  background: #cbd5e1;
+  color: #ff5900;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .lang-btn:hover:not(:disabled):not(.active) {
