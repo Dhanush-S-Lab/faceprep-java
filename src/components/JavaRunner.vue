@@ -59,6 +59,7 @@ const switchLanguage = (lang) => {
   editorInstance.setValue(STARTER_CODE[lang])
   output.value = ''
   isError.value = false
+  showVisualizer.value = false
 }
 
 onMounted(() => {
@@ -100,6 +101,22 @@ onUnmounted(() => {
     editorInstance.dispose()
   }
 })
+
+const showVisualizer = ref(false)
+const visualizerUrl = ref('')
+
+const visualizeCode = () => {
+  if (!editorInstance) return
+  
+  const code = editorInstance.getValue()
+  // PythonTutor accepts 'java' and 'cpp_g++9.3.0' or 'cpp'
+  const pyLang = selectedLanguage.value === 'java' ? 'java' : 'cpp'
+  const encodedCode = encodeURIComponent(code)
+  
+  visualizerUrl.value = `https://pythontutor.com/iframe-embed.html#code=${encodedCode}&cumulative=false&heapPrimitives=nevernest&mode=display&origin=opt-frontend.js&py=${pyLang}&rawInputLstJSON=%5B%5D&textReferences=false`
+  
+  showVisualizer.value = true
+}
 
 const executeCode = async () => {
   if (!editorInstance) return
@@ -178,6 +195,10 @@ const executeCode = async () => {
           </button>
         </div>
 
+        <button @click="visualizeCode" :disabled="isRunning" class="visualize-btn">
+          <span class="icon">👁️</span> Visualize
+        </button>
+
         <button @click="executeCode" :disabled="isRunning" class="run-btn" :class="{ running: isRunning }">
           <span class="icon">{{ isRunning ? '⚙' : '▶' }}</span>
           {{ isRunning ? 'Running' : 'Run' }}
@@ -186,7 +207,7 @@ const executeCode = async () => {
       <div ref="editorContainer" class="editor-container"></div>
     </div>
 
-    <div class="io-panels">
+    <div v-show="!showVisualizer" class="io-panels">
       <div class="pane input-pane">
         <label>Standard Input <span class="sub-label">(If required)</span></label>
         <textarea v-model="input" placeholder="Type inputs to Scanner here..."></textarea>
@@ -195,6 +216,14 @@ const executeCode = async () => {
         <label>Console Output</label>
         <pre :class="{ error: isError }">{{ output }}</pre>
       </div>
+    </div>
+
+    <div v-if="showVisualizer" class="visualizer-pane pane">
+      <div class="visualizer-header">
+        <label>Memory Visualizer</label>
+        <button @click="showVisualizer = false" class="close-btn">✖ Close</button>
+      </div>
+      <iframe :src="visualizerUrl" width="100%" height="500" frameborder="0"></iframe>
     </div>
   </div>
 </template>
@@ -332,11 +361,67 @@ const executeCode = async () => {
   transform: translateY(-1px);
 }
 
-.run-btn:disabled {
+.run-btn:disabled, .visualize-btn:disabled {
   background: #ffb380;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.visualize-btn {
+  background: #475569;
+  color: white;
+  border: none;
+  padding: 0.4rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(71, 85, 105, 0.25);
+  margin-right: 0.5rem;
+}
+
+.visualize-btn:hover:not(:disabled) {
+  background: #334155;
+  transform: translateY(-1px);
+}
+
+.visualizer-pane {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.visualizer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #e2e8f0;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.close-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.close-btn:hover {
+  background: #dc2626;
 }
 
 .run-btn.running .icon {
