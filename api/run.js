@@ -15,10 +15,10 @@ module.exports = async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { code, input } = req.body
+  const { code, input, language = 'java' } = req.body
 
-  const apiUrl = process.env.JAVA_EXECUTION_API_URL
-  const apiKey = process.env.JAVA_EXECUTION_API_KEY
+  const apiUrl = process.env.VITE_EXECUTION_API_URL
+  const apiKey = process.env.VITE_EXECUTION_API_KEY
 
   if (!apiUrl || !apiKey) {
     return res.status(500).json({ success: false, error: 'API configuration missing on server.' })
@@ -31,7 +31,7 @@ module.exports = async function handler(req, res) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey
       },
-      body: JSON.stringify({ code, input: input || '' })
+      body: JSON.stringify({ code, input: input || '', language })
     })
 
     const data = await response.json()

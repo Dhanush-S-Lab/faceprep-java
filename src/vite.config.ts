@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 
 export default defineConfig(({ mode }) => {
-  console.log(">>>> VITE CONFIG LOADED <<<<", mode);
   const env = loadEnv(mode, process.cwd(), '')
   return {
     server: {

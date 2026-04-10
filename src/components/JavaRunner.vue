@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 
@@ -12,10 +12,18 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Auto-detect environment: localhost dev vs Vercel production
-const API_URL = import.meta.env.DEV
-  ? 'http://localhost:3000/api/run-java'
-  : '/api/run-java'
+// Proxy routes `/api/run` locally to bypass CORS and injects key; Vercel routes it to serverless func in prod.
+const API_URL = '/api/run'
+
+const STARTER_CODE = {
+  java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, Java!");\n    }\n}',
+  cpp:  '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, C++!" << endl;\n    return 0;\n}'
+}
+
+const LANGUAGE_META = {
+  java: { label: 'Java',  filename: 'Main.java',  monaco: 'java' },
+  cpp:  { label: 'C++',   filename: 'main.cpp',   monaco: 'cpp'  }
+}
 
 const props = defineProps({
   question: {
@@ -24,9 +32,16 @@ const props = defineProps({
   },
   initialCode: {
     type: String,
-    default: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, Java!");\n    }\n}'
+    default: ''
+  },
+  initialLanguage: {
+    type: String,
+    default: 'java'
   }
 })
+
+const selectedLanguage = ref(props.initialLanguage)
+const filename = computed(() => LANGUAGE_META[selectedLanguage.value].filename)
 
 const editorContainer = ref(null)
 const input = ref('')
@@ -35,12 +50,24 @@ const isRunning = ref(false)
 const isError = ref(false)
 let editorInstance = null
 
+const switchLanguage = (lang) => {
+  if (lang === selectedLanguage.value || !editorInstance) return
+  selectedLanguage.value = lang
+  // Update Monaco language mode
+  monaco.editor.setModelLanguage(editorInstance.getModel(), LANGUAGE_META[lang].monaco)
+  // Reset to boilerplate for the new language
+  editorInstance.setValue(STARTER_CODE[lang])
+  output.value = ''
+  isError.value = false
+}
+
 onMounted(() => {
   nextTick(() => {
     if (editorContainer.value) {
+      const startCode = props.initialCode || STARTER_CODE[selectedLanguage.value]
       editorInstance = monaco.editor.create(editorContainer.value, {
-        value: props.initialCode,
-        language: 'java',
+        value: startCode,
+        language: LANGUAGE_META[selectedLanguage.value].monaco,
         theme: 'vs-dark',
         minimap: { enabled: false },
         automaticLayout: true,
@@ -83,25 +110,33 @@ const executeCode = async () => {
 
   try {
     const code = editorInstance.getValue()
+    const headers = { 'Content-Type': 'application/json' }
+    
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, input: input.value })
+      headers,
+      body: JSON.stringify({ code, input: input.value, language: selectedLanguage.value })
     })
 
-    let data
+    let data = {}
     try { data = await res.json() } catch (e) {}
 
-    if (!res.ok) {
-      throw new Error(data?.error || 'Unknown Error')
+    let resultObj = data
+    if (data && data.success !== undefined && data.data) {
+      resultObj = data.data
     }
 
-    if (data.success) {
-      output.value = data.data?.output || 'No output.'
-      if (data.data?.error) {
-        isError.value = true
-        output.value += '\n' + data.data.error
-      }
+    if (!res.ok) {
+      const errMsg = resultObj?.error || data?.error || 'Unknown Error'
+      throw new Error(errMsg)
+    }
+
+    if (resultObj.error) {
+      isError.value = true
+      output.value = resultObj.error
+    } else if (resultObj.output !== undefined) {
+      isError.value = false
+      output.value = resultObj.output || 'No output.'
     } else {
       isError.value = true
       output.value = data.error || 'Execution failed.'
@@ -127,7 +162,22 @@ const executeCode = async () => {
         <span class="dot red"></span>
         <span class="dot yellow"></span>
         <span class="dot green"></span>
-        <span class="filename">Main.java</span>
+        <span class="filename">{{ filename }}</span>
+
+        <!-- Language Selector -->
+        <div class="lang-selector">
+          <button
+            v-for="(meta, key) in LANGUAGE_META"
+            :key="key"
+            class="lang-btn"
+            :class="{ active: selectedLanguage === key }"
+            @click="switchLanguage(key)"
+            :disabled="isRunning"
+          >
+            {{ meta.label }}
+          </button>
+        </div>
+
         <button @click="executeCode" :disabled="isRunning" class="run-btn" :class="{ running: isRunning }">
           <span class="icon">{{ isRunning ? '⚙' : '▶' }}</span>
           {{ isRunning ? 'Running' : 'Run' }}
@@ -295,5 +345,45 @@ const executeCode = async () => {
 
 @keyframes spin {
   100% { transform: rotate(360deg); }
+}
+
+/* Language Selector */
+.lang-selector {
+  display: flex;
+  gap: 2px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  padding: 2px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.lang-btn {
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.02em;
+}
+
+.lang-btn:hover:not(:disabled):not(.active) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.lang-btn.active {
+  background: #ff5900;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(255, 89, 0, 0.35);
+}
+
+.lang-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
