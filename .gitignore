@@ -2,3 +2,14 @@ node_modules
 dist
 .env
 .env.local
+
+# Slide templating system
+templates/
+scripts/
+SLIDEV_WORKFLOW.md
+DEVELOPMENT_WORKFLOW.md
+.kiro/specs/slide-template-system/tasks.md
+.kiro/specs/slide-template-system/requirements.md
+.kiro/specs/slide-template-system/design.md
+src/03-operators.md
+src/99-template-check.md

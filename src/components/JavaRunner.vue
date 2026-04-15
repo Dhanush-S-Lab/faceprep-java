@@ -16,13 +16,85 @@ if (typeof window !== 'undefined') {
 const API_URL = '/api/run'
 
 const STARTER_CODE = {
-  java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, Java!");\n    }\n}',
-  cpp:  '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, C++!" << endl;\n    return 0;\n}'
+  java:   'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, Java!");\n    }\n}',
+  cpp:    '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, C++!" << endl;\n    return 0;\n}',
+  python: 'print("Hello, Python!")'
 }
 
 const LANGUAGE_META = {
-  java: { label: 'Java',  filename: 'Main.java',  monaco: 'java' },
-  cpp:  { label: 'C++',   filename: 'main.cpp',   monaco: 'cpp'  }
+  java:   { label: 'Java',   filename: 'Main.java',  monaco: 'java',   pytutor: 'java'   },
+  cpp:    { label: 'C++',    filename: 'main.cpp',   monaco: 'cpp',    pytutor: 'cpp'    },
+  python: { label: 'Python', filename: 'main.py',    monaco: 'python', pytutor: '3'      }
+}
+
+// ── Pyodide (run Python in-browser via WebAssembly) ──────────────────────────
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/pyodide.js'
+let pyodideInstance = null
+const pyodideLoading = ref(false)
+const pyodideReady  = ref(false)
+
+async function ensurePyodide() {
+  if (pyodideInstance) return pyodideInstance
+  pyodideLoading.value = true
+  // Inject the CDN script once
+  if (!document.getElementById('pyodide-script')) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.id  = 'pyodide-script'
+      s.src = PYODIDE_CDN
+      s.onload  = resolve
+      s.onerror = reject
+      document.head.appendChild(s)
+    })
+  }
+  // loadPyodide is now on window after the script loads
+  pyodideInstance = await window.loadPyodide()
+  pyodideLoading.value = false
+  pyodideReady.value   = true
+  return pyodideInstance
+}
+
+async function runWithPyodide(code, stdinText) {
+  const py = await ensurePyodide()
+
+  // Build a list of lines for input() to consume
+  const lines = stdinText ? stdinText.split('\n') : []
+  let lineIndex = 0
+
+  // Capture output
+  let stdout = ''
+  let stderr = ''
+
+  py.setStdout({ batched: (s) => { stdout += s + '\n' } })
+  py.setStderr({ batched: (s) => { stderr += s + '\n' } })
+
+  // Mock input() so it consumes the pre-filled stdin lines
+  py.globals.set('_input_lines', py.toPy(lines))
+  py.runPython(`
+import builtins, sys, io
+_input_idx = 0
+def _mocked_input(prompt=''):
+    global _input_idx
+    if prompt:
+        print(prompt, end='')
+    if _input_idx < len(_input_lines):
+        val = _input_lines[_input_idx]
+        _input_idx += 1
+        return val
+    return ''
+builtins.input = _mocked_input
+`)
+
+  try {
+    await py.runPythonAsync(code)
+    return { output: stdout.trimEnd() || '(no output)', error: null }
+  } catch (e) {
+    return { output: null, error: stderr.trimEnd() || e.message }
+  } finally {
+    // Restore defaults so next run is clean
+    py.setStdout({})
+    py.setStderr({})
+  }
 }
 
 const props = defineProps({
@@ -138,8 +210,8 @@ const visualizeCode = () => {
   if (!editorInstance) return
   
   const code = editorInstance.getValue()
-  // PythonTutor accepts 'java' and 'cpp_g++9.3.0' or 'cpp'
-  const pyLang = selectedLanguage.value === 'java' ? 'java' : 'cpp'
+  // PythonTutor py param: 'java' | 'cpp' | '3' (Python 3)
+  const pyLang = LANGUAGE_META[selectedLanguage.value].pytutor
   const encodedCode = encodeURIComponent(code)
   
   visualizerUrl.value = `https://pythontutor.com/iframe-embed.html#code=${encodedCode}&cumulative=false&heapPrimitives=nevernest&mode=display&origin=opt-frontend.js&py=${pyLang}&rawInputLstJSON=%5B%5D&textReferences=false`
@@ -151,8 +223,33 @@ const executeCode = async () => {
   if (!editorInstance) return
 
   isRunning.value = true
+  isError.value   = false
+
+  // ── Python: run entirely in-browser via Pyodide ──────────────────────────
+  if (selectedLanguage.value === 'python') {
+    output.value = pyodideReady.value
+      ? 'Running Python...'
+      : '⏳ Loading Python runtime (first run only)...'
+    try {
+      const code = editorInstance.getValue()
+      const result = await runWithPyodide(code, input.value)
+      if (result.error) {
+        isError.value = true
+        output.value  = result.error
+      } else {
+        output.value = result.output
+      }
+    } catch (err) {
+      isError.value = true
+      output.value  = err.message
+    } finally {
+      isRunning.value = false
+    }
+    return
+  }
+
+  // ── Java / C++: use backend API ───────────────────────────────────────────
   output.value = 'Compiling and Running...'
-  isError.value = false
 
   try {
     const code = editorInstance.getValue()
@@ -205,54 +302,65 @@ const executeCode = async () => {
 
     <div class="editor-wrapper">
       <div class="mac-header">
-        <span class="dot red"></span>
-        <span class="dot yellow"></span>
-        <span class="dot green"></span>
-        <span class="filename">{{ filename }}</span>
-
-        <!-- Editor Toolbar -->
-        <div class="toolbar">
-          <button class="icon-btn" @click="resetCode" title="Reset Code">
-            <div class="i-lucide-rotate-ccw"></div>
-          </button>
-          <button class="icon-btn" @click="toggleTheme" title="Toggle Theme">
-            <div v-if="editorTheme === 'vs-dark'" class="i-lucide-sun"></div>
-            <div v-else class="i-lucide-moon"></div>
-          </button>
-          <button class="icon-btn" @click="changeFontSize(-1)" title="Decrease Font">
-            <div class="i-lucide-minus"></div>
-          </button>
-          <button class="icon-btn" @click="changeFontSize(1)" title="Increase Font">
-            <div class="i-lucide-plus"></div>
-          </button>
-          <button class="icon-btn" @click="toggleWordWrap" :class="{ 'wrap-active': wordWrap === 'on' }" title="Toggle Word Wrap">
-            <div class="i-lucide-wrap-text"></div>
-          </button>
+        <!-- Left: stable dots + filename group -->
+        <div class="header-left">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+          <span class="filename">{{ filename }}</span>
         </div>
 
-        <!-- Language Selector -->
-        <div class="lang-selector">
-          <button
-            v-for="(meta, key) in LANGUAGE_META"
-            :key="key"
-            class="lang-btn"
-            :class="{ active: selectedLanguage === key }"
-            @click="switchLanguage(key)"
-            :disabled="isRunning"
-          >
-            {{ meta.label }}
+        <!-- Right: all controls -->
+        <div class="header-right">
+          <!-- Editor Toolbar -->
+          <div class="toolbar">
+            <button class="icon-btn" @click="resetCode" title="Reset Code">
+              <div class="i-lucide-rotate-ccw"></div>
+            </button>
+            <button class="icon-btn" @click="toggleTheme" title="Toggle Theme">
+              <div v-if="editorTheme === 'vs-dark'" class="i-lucide-sun"></div>
+              <div v-else class="i-lucide-moon"></div>
+            </button>
+            <button class="icon-btn" @click="changeFontSize(-1)" title="Decrease Font">
+              <div class="i-lucide-minus"></div>
+            </button>
+            <button class="icon-btn" @click="changeFontSize(1)" title="Increase Font">
+              <div class="i-lucide-plus"></div>
+            </button>
+            <button class="icon-btn" @click="toggleWordWrap" :class="{ 'wrap-active': wordWrap === 'on' }" title="Toggle Word Wrap">
+              <div class="i-lucide-wrap-text"></div>
+            </button>
+          </div>
+
+          <!-- Language Selector -->
+          <div class="lang-selector">
+            <button
+              v-for="(meta, key) in LANGUAGE_META"
+              :key="key"
+              class="lang-btn"
+              :class="{ active: selectedLanguage === key }"
+              @click="switchLanguage(key)"
+              :disabled="isRunning"
+            >
+              {{ meta.label }}
+            </button>
+          </div>
+
+          <button @click="visualizeCode" :disabled="isRunning" class="visualize-btn">
+            <div class="i-lucide-eye"></div> Visualize
+          </button>
+
+          <!-- Browser badge shown only for Python -->
+          <span v-if="selectedLanguage === 'python'" class="browser-badge">
+            <div class="i-lucide-zap"></div> In-Browser
+          </span>
+
+          <button @click="executeCode" :disabled="isRunning" class="run-btn" :class="{ running: isRunning }">
+            <div v-if="isRunning" class="i-lucide-loader-2 animate-spin"></div>
+            <div v-else class="i-lucide-play"></div>
+            {{ isRunning ? 'Running' : 'Run' }}
           </button>
         </div>
-
-        <button @click="visualizeCode" :disabled="isRunning" class="visualize-btn">
-          <div class="i-lucide-eye"></div> Visualize
-        </button>
-
-        <button @click="executeCode" :disabled="isRunning" class="run-btn" :class="{ running: isRunning }">
-          <div v-if="isRunning" class="i-lucide-loader-2 animate-spin"></div>
-          <div v-else class="i-lucide-play"></div>
-          {{ isRunning ? 'Running' : 'Run' }}
-        </button>
       </div>
       <div ref="editorContainer" class="editor-container"></div>
     </div>
@@ -260,7 +368,10 @@ const executeCode = async () => {
     <div v-show="!showVisualizer" class="io-panels">
       <div class="pane input-pane">
         <label>Standard Input <span class="sub-label">(If required)</span></label>
-        <textarea v-model="input" placeholder="Type inputs to Scanner here..."></textarea>
+        <textarea
+          v-model="input"
+          :placeholder="selectedLanguage === 'python' ? 'Values for input() calls, one per line...' : 'Type inputs to Scanner here...'"
+        ></textarea>
       </div>
       <div class="pane output-pane">
         <label>Console Output</label>
@@ -316,23 +427,38 @@ const executeCode = async () => {
 .mac-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 8px 12px;
   background: #f1f5f9;
   border-bottom: 1px solid #cbd5e1;
 }
 
-.dot { width: 12px; height: 12px; border-radius: 50%; }
+/* Left group: dots + filename — never shrinks or wraps */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Right group: all controls — allowed to shrink together if needed */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .dot.red { background: #ef4444; }
 .dot.yellow { background: #f59e0b; }
 .dot.green { background: #10b981; }
 
 .filename {
-  margin-left: 10px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
   color: #64748b;
-  flex-grow: 1;
 }
 
 .editor-container {
@@ -396,15 +522,19 @@ const executeCode = async () => {
   background: #ff5900;
   color: white;
   border: none;
-  padding: 0.4rem 1.25rem;
+  /* Fixed width prevents layout shift when text swaps Run ↔ Running */
+  min-width: 84px;
+  padding: 0.4rem 0.9rem;
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  transition: background 0.2s ease, transform 0.2s ease;
   box-shadow: 0 2px 4px rgba(255, 89, 0, 0.25);
 }
 
@@ -424,17 +554,19 @@ const executeCode = async () => {
   background: #475569;
   color: white;
   border: none;
-  padding: 0.4rem 1.25rem;
+  padding: 0.4rem 0.9rem;
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
+  justify-content: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  transition: background 0.2s ease, transform 0.2s ease;
   box-shadow: 0 2px 4px rgba(71, 85, 105, 0.25);
-  margin-right: 0.5rem;
+  /* margin-right removed — gap handles spacing */
 }
 
 .visualize-btn:hover:not(:disabled) {
@@ -490,8 +622,8 @@ const executeCode = async () => {
   background: #e2e8f0;
   border-radius: 6px;
   padding: 2px;
-  margin-left: auto;
-  margin-right: 8px;
+  flex-shrink: 0;
+  /* margin-left:auto removed — .filename flex-grow already pushes this to the right */
 }
 
 .lang-btn {
@@ -509,8 +641,8 @@ const executeCode = async () => {
 
 .toolbar {
   display: flex;
-  gap: 4px;
-  margin-left: 1rem;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -550,5 +682,22 @@ const executeCode = async () => {
 .lang-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Python in-browser badge */
+.browser-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-right: 4px;
+  white-space: nowrap;
 }
 </style>

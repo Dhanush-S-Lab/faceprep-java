@@ -1,6 +1,14 @@
 <script setup>
-import { useNav } from '@slidev/client'
+import { computed } from 'vue'
+import { useNav, useSlideContext } from '@slidev/client'
+
 const { currentPage, total } = useNav()
+const { $frontmatter } = useSlideContext()
+
+const courseName = computed(() => $frontmatter.value?.courseName || 'Java Programming')
+const sessionLabel = computed(() => $frontmatter.value?.sessionLabel || 'Session')
+const sessionTitle = computed(() => $frontmatter.value?.sessionTitle || $frontmatter.value?.title || 'Untitled Deck')
+const footerModule = computed(() => $frontmatter.value?.footerModule || `${sessionLabel.value} - ${sessionTitle.value}`)
 </script>
 
 <template>
@@ -9,10 +17,10 @@ const { currentPage, total } = useNav()
       <div class="fp-logo"><span class="fp-logo-f">F</span></div>
       <span class="fp-name">FACEPrep</span>
       <span class="fp-divider">|</span>
-      <span class="fp-course">Java Programming</span>
+      <span class="fp-course">{{ courseName }}</span>
     </div>
     <div class="fp-slide-info">
-      <span class="fp-module">Session 01 · Introduction to Java</span>
+      <span class="fp-module">{{ footerModule }}</span>
     </div>
     <div class="fp-page">
       <span class="fp-page-num">{{ currentPage }}</span>
@@ -113,3 +121,6 @@ const { currentPage, total } = useNav()
   font-size: 0.8rem;
 }
 </style>
+
+
+
