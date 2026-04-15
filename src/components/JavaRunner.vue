@@ -213,8 +213,16 @@ const visualizeCode = () => {
   // PythonTutor py param: 'java' | 'cpp' | '3' (Python 3)
   const pyLang = LANGUAGE_META[selectedLanguage.value].pytutor
   const encodedCode = encodeURIComponent(code)
+
+  // Pre-populate stdin lines from our input textarea so PythonTutor
+  // doesn't show its own input form (which navigates to a new page).
+  // Split on newlines, keep non-empty lines only.
+  const stdinLines = input.value
+    ? input.value.split('\n').filter(line => line !== '')
+    : []
+  const rawInputJson = encodeURIComponent(JSON.stringify(stdinLines))
   
-  visualizerUrl.value = `https://pythontutor.com/iframe-embed.html#code=${encodedCode}&cumulative=false&heapPrimitives=nevernest&mode=display&origin=opt-frontend.js&py=${pyLang}&rawInputLstJSON=%5B%5D&textReferences=false`
+  visualizerUrl.value = `https://pythontutor.com/iframe-embed.html#code=${encodedCode}&cumulative=false&heapPrimitives=nevernest&mode=display&origin=opt-frontend.js&py=${pyLang}&rawInputLstJSON=${rawInputJson}&textReferences=false`
   
   showVisualizer.value = true
 }
