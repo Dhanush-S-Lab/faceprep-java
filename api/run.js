@@ -34,7 +34,17 @@ export default async function handler(req, res) {
       body: JSON.stringify({ code, input: input || '', language })
     })
 
-    const data = await response.json()
+    const rawText = await response.text()
+    let data;
+    try {
+      data = JSON.parse(rawText)
+    } catch (e) {
+      // The server returned HTML or plain text instead of JSON
+      return res.status(response.status).json({
+        success: false,
+        error: `Execution server returned HTTP ${response.status} non-JSON response: ${rawText.slice(0, 200)}...`
+      })
+    }
 
     if (!response.ok) {
       return res.status(response.status).json({
