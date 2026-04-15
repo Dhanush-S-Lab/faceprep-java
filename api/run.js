@@ -1,7 +1,7 @@
 // Vercel Serverless Function — proxies Java code execution to the remote VM
-// CommonJS format required for Vercel Node.js runtime
+// ES module format — package.json has "type": "module"
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // Handle CORS preflight
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
