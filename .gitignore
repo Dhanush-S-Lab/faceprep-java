@@ -5,7 +5,8 @@ dist
 
 # Slide templating system
 templates/
-scripts/
+scripts/update-session-scripts.mjs
+scripts/workflow-integration.mjs
 SLIDEV_WORKFLOW.md
 DEVELOPMENT_WORKFLOW.md
 .kiro/specs/slide-template-system/tasks.md
