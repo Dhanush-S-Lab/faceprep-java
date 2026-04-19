@@ -373,7 +373,7 @@ const executeCode = async () => {
       <div ref="editorContainer" class="editor-container"></div>
     </div>
 
-    <div v-show="!showVisualizer" class="io-panels">
+    <div class="io-panels">
       <div class="pane input-pane">
         <label>Standard Input <span class="sub-label">(If required)</span></label>
         <textarea
@@ -387,15 +387,19 @@ const executeCode = async () => {
       </div>
     </div>
 
-    <div v-if="showVisualizer" class="visualizer-pane pane">
-      <div class="visualizer-header">
-        <label>Memory Visualizer</label>
-        <button @click="showVisualizer = false" class="close-btn">
-          <div class="i-lucide-x"></div> Close
-        </button>
+    <Teleport to="body">
+      <div v-if="showVisualizer" class="modal-overlay" @click.self="showVisualizer = false">
+        <div class="visualizer-pane modal-content">
+          <div class="visualizer-header">
+            <label>Memory Visualizer</label>
+            <button @click="showVisualizer = false" class="close-btn">
+              <div class="i-lucide-x"></div> Close
+            </button>
+          </div>
+          <iframe :src="visualizerUrl" width="100%" style="flex: 1" frameborder="0"></iframe>
+        </div>
       </div>
-      <iframe :src="visualizerUrl" width="100%" height="500" frameborder="0"></iframe>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -589,6 +593,30 @@ const executeCode = async () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.modal-content {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .visualizer-header {
